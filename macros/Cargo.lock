@@ -29,13 +29,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rarsec"
-version = "0.1.0"
-dependencies = [
- "macros",
-]
-
-[[package]]
 name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
