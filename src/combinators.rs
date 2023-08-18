@@ -3,10 +3,7 @@ use macros::du;
 use crate::{text, Parser};
 
 pub fn alternative<T: 'static>(f: Parser<T>, g: Parser<T>) -> Parser<T> {
-    Box::new(move |input| match f(input) {
-        None => g(input),
-        Some(xs) => Some(xs),
-    })
+    Box::new(move |input| f(input).or_else(|| g(input)))
 }
 
 pub fn sequence<T: Clone + 'static, U: 'static>(f: Parser<T>, g: Parser<U>) -> Parser<(T, U)> {
@@ -14,6 +11,14 @@ pub fn sequence<T: Clone + 'static, U: 'static>(f: Parser<T>, g: Parser<U>) -> P
         let (ftree, rest) = f(input)?;
         let (gtree, rest) = g(rest)?;
         Some(((ftree, gtree), rest))
+    })
+}
+
+pub fn then<T: 'static, U: 'static>(f: Parser<T>, g: Parser<U>) -> Parser<U> {
+    Box::new(move |input| {
+        let (_, rest) = f(input)?;
+        let (gtree, rest) = g(rest)?;
+        Some((gtree, rest))
     })
 }
 
@@ -34,7 +39,6 @@ pub fn many<T: 'static>(f: Parser<T>) -> Parser<Vec<T>> {
     })
 }
 
-// could be du! { (f >> ()) <|> text::empty() }
 pub fn optional<T: 'static>(f: Parser<T>) -> Parser<()> {
     alternative(
         du! {
@@ -43,6 +47,11 @@ pub fn optional<T: 'static>(f: Parser<T>) -> Parser<()> {
         },
         text::empty(),
     )
+    // TODO: return as keyword
+    // du! {
+    //     let res <- (f >> return ()) | text::empty();
+    //     return res;
+    // }
 }
 
 #[cfg(test)]
@@ -69,5 +78,7 @@ mod tests {
             many(text::one_of("abc"))(input),
             Some((Vec::new(), "hello"))
         );
+        assert_eq!(optional(text::character('!'))(input), Some(((), "hello")));
+        assert_eq!(optional(text::character('h'))(input), Some(((), "ello")));
     }
 }

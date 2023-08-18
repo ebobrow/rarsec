@@ -16,8 +16,7 @@ mod tests {
             du! {
                 let h <- text::character('h');
                 let e <- text::character('e');
-                let l <- text::character('l');
-                text::character('l');
+                let l <- text::character('l') >> text::character('l');
                 let o <- text::character('o');
                 return vec![h, e, l, l, o];
             }

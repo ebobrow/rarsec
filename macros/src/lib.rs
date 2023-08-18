@@ -1,7 +1,7 @@
 // TODO: add fun stuff like >>= for one-liners
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse::Parse, parse_macro_input, Expr, Ident, Token};
+use syn::{parse::Parse, parse_macro_input, BinOp, Expr, Ident, Token};
 
 struct Line {
     x: Option<Ident>,
@@ -49,6 +49,39 @@ impl Parse for MacroInput {
     }
 }
 
+fn quote_expr(e: &Expr) -> proc_macro2::TokenStream {
+    match e {
+        Expr::Binary(binexp) => {
+            match binexp.op {
+                // |
+                BinOp::BitOr(_) => {
+                    let left = quote_expr(&binexp.left);
+                    let right = quote_expr(&binexp.right);
+                    quote! {
+                        Box::new(move |input| #left(input).or_else(|| #right(input)))
+                    }
+                }
+
+                // >>
+                BinOp::Shr(_) => {
+                    let left = quote_expr(&binexp.left);
+                    let right = quote_expr(&binexp.right);
+                    quote! {
+                        Box::new(move |input| {
+                            let (_, rest) = #left(input)?;
+                            let (tree, rest) = #right(rest)?;
+                            Some((tree, rest))
+                        })
+                    }
+                }
+
+                _ => unimplemented!(),
+            }
+        }
+        _ => quote! { #e },
+    }
+}
+
 /// Emulates Haskell's `do` notation
 /// # Example:
 /// ```rust
@@ -72,7 +105,7 @@ pub fn du(item: TokenStream) -> TokenStream {
             })
         })
     } else {
-        let f = &input.lines[0].f;
+        let f = quote_expr(&input.lines[0].f);
         let first_line = if let Some(x) = &input.lines[0].x {
             quote! { let (#x, rest) = #f(input)?; }
         } else {
@@ -83,7 +116,7 @@ pub fn du(item: TokenStream) -> TokenStream {
             .iter()
             .skip(1)
             .map(|line| {
-                let f = &line.f;
+                let f = quote_expr(&line.f);
                 if let Some(x) = &line.x {
                     quote! { let (#x, rest) = #f(rest)?; }
                 } else {
@@ -92,12 +125,13 @@ pub fn du(item: TokenStream) -> TokenStream {
             })
             .collect();
         let ret = input.ret;
-        TokenStream::from(quote! {
+        quote! {
             Box::new(move |input| {
                 #first_line
                 #(#next_lines)*
                 Some((#ret, rest))
             })
-        })
+        }
+        .into()
     }
 }
