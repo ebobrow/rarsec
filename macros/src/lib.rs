@@ -1,4 +1,3 @@
-// TODO: add fun stuff like >>= for one-liners
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse::Parse, parse_macro_input, BinOp, Expr, Ident, Token};
@@ -78,6 +77,7 @@ fn quote_expr(e: &Expr) -> proc_macro2::TokenStream {
                 _ => unimplemented!(),
             }
         }
+        Expr::Group(group) => quote_expr(&group.expr),
         _ => quote! { #e },
     }
 }
