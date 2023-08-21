@@ -16,7 +16,6 @@ struct MacroInput {
 impl Parse for Line {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
-        // TODO: get rid of let
         if lookahead.peek(Token![let]) {
             let _: Token![let] = input.parse()?;
             let x: Ident = input.parse()?;

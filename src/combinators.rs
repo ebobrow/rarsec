@@ -2,10 +2,12 @@ use macros::du;
 
 use crate::{text::empty, Parser};
 
+/// Parse using `f`, or if `f` fails, using `g`
 pub fn choice<T: 'static>(f: Parser<T>, g: Parser<T>) -> Parser<T> {
     Box::new(move |input| f(input).or_else(|| g(input)))
 }
 
+/// Parse `n` consecutive occurrences of `f`
 pub fn count<T: 'static>(n: usize, f: Parser<T>) -> Parser<Vec<T>> {
     Box::new(move |input| {
         let mut res = Vec::with_capacity(n);
@@ -21,6 +23,13 @@ pub fn count<T: 'static>(n: usize, f: Parser<T>) -> Parser<Vec<T>> {
     })
 }
 
+/// Parse `p` if it occurs between `open` and `close`
+/// # Example
+/// ```rust
+/// # use rarsec::{combinators::between, parse, text::{character, digit}};
+/// let parens = between(character('('), character(')'), digit());
+/// assert_eq!(parse(parens, "(1)").unwrap(), '1');
+/// ```
 pub fn between<T: 'static, U: 'static, V: 'static>(
     open: Parser<U>,
     close: Parser<V>,
@@ -34,14 +43,8 @@ pub fn between<T: 'static, U: 'static, V: 'static>(
     })
 }
 
-pub fn sequence<T: 'static, U: 'static>(f: Parser<T>, g: Parser<U>) -> Parser<(T, U)> {
-    Box::new(move |input| {
-        let (ftree, rest) = f(input)?;
-        let (gtree, rest) = g(rest)?;
-        Some(((ftree, gtree), rest))
-    })
-}
-
+/// Parse `f`, discarding its output, and then parse `g`. This is the same as `f >> g` in Haskell
+/// or `du!` notation.
 pub fn then<T: 'static, U: 'static>(f: Parser<T>, g: Parser<U>) -> Parser<U> {
     Box::new(move |input| {
         let (_, rest) = f(input)?;
@@ -50,6 +53,7 @@ pub fn then<T: 'static, U: 'static>(f: Parser<T>, g: Parser<U>) -> Parser<U> {
     })
 }
 
+/// Attempt parsing using `f`, returning `default` if it fails
 pub fn option<T: Clone + 'static>(default: T, f: Parser<T>) -> Parser<T> {
     Box::new(move |input| {
         if let Some(res) = f(input) {
@@ -71,6 +75,7 @@ pub fn option_option<T: 'static>(f: Parser<T>) -> Parser<Option<T>> {
     })
 }
 
+/// Parse 0 or 1 instances of `f`, returning `()`
 pub fn optional<T: 'static>(f: Parser<T>) -> Parser<()> {
     choice(
         Box::new(du! {
@@ -94,6 +99,7 @@ pub fn optional<T: 'static>(f: Parser<T>) -> Parser<()> {
     // }
 }
 
+/// Skip 1 or more instances of `f`, returning `()`
 pub fn skip_many1<T: 'static>(f: Parser<T>) -> Parser<()> {
     Box::new(move |input| {
         if let Some((_, rest)) = f(input) {
@@ -108,6 +114,7 @@ pub fn skip_many1<T: 'static>(f: Parser<T>) -> Parser<()> {
     })
 }
 
+/// Parse 1 or more instances of `f`
 pub fn many1<T: 'static>(f: Parser<T>) -> Parser<Vec<T>> {
     Box::new(move |input| {
         let mut out = Vec::new();
@@ -125,6 +132,7 @@ pub fn many1<T: 'static>(f: Parser<T>) -> Parser<Vec<T>> {
     })
 }
 
+/// Parse 0 or more instances of `f`
 pub fn many<T: 'static>(f: Parser<T>) -> Parser<Vec<T>> {
     Box::new(move |input| {
         let mut out = Vec::new();
@@ -153,10 +161,6 @@ mod tests {
         assert_eq!(
             choice(character('x'), character('h'))(input),
             Some(('h', "ello"))
-        );
-        assert_eq!(
-            sequence(character('h'), character('e'))(input),
-            Some((('h', 'e'), "llo"))
         );
         assert_eq!(many(one_of("he"))(input), Some((vec!['h', 'e'], "llo")));
         assert_eq!(many(one_of("abc"))(input), Some((Vec::new(), "hello")));
