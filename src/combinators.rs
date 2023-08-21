@@ -154,9 +154,12 @@ pub fn sep_by<T: 'static, U: 'static>(f: parser!(T), sep: parser!(U)) -> parser!
             let mut ptr = rest;
             out.push(tree);
             while let Some((_, rest)) = sep(ptr) {
-                let (tree, rest) = f(rest)?;
-                out.push(tree);
-                ptr = rest;
+                if let Some((tree, rest)) = f(rest) {
+                    out.push(tree);
+                    ptr = rest;
+                } else {
+                    return Some((out, ptr));
+                }
             }
             Some((out, ptr))
         } else {
@@ -173,9 +176,12 @@ pub fn sep_by1<T: 'static, U: 'static>(f: parser!(T), sep: parser!(U)) -> parser
             let mut ptr = rest;
             out.push(tree);
             while let Some((_, rest)) = sep(ptr) {
-                let (tree, rest) = f(rest)?;
-                out.push(tree);
-                ptr = rest;
+                if let Some((tree, rest)) = f(rest) {
+                    out.push(tree);
+                    ptr = rest;
+                } else {
+                    return Some((out, ptr));
+                }
             }
             Some((out, ptr))
         } else {
