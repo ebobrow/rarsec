@@ -14,20 +14,32 @@ pub fn parse<T>(parser: Parser<T>, input: &str) -> Option<T> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{combinators::many, text::character};
+
     use super::*;
 
     #[test]
     fn do_notation() {
         fn hello() -> Parser<Vec<char>> {
-            du! {
-                let h <- text::character('h');
-                let e <- text::character('e');
-                let l <- text::character('l') >> text::character('l');
-                let o <- text::character('o');
+            Box::new(du! {
+                let h <- character('h');
+                let e <- character('e');
+                let l <- character('l') >> character('l');
+                let o <- character('o');
                 return vec![h, e, l, l, o];
-            }
+            })
         }
 
         assert_eq!(hello()("hello"), Some((vec!['h', 'e', 'l', 'l', 'o'], "")));
+
+        assert_eq!(
+            (du! {
+                let he <- many(character('h') | character('e'));
+                let l <- character('l');
+                let lo <- character('l') >> character('o');
+                return (he, l, lo);
+            })("hello"),
+            Some(((vec!['h', 'e'], 'l', 'o'), ""))
+        );
     }
 }

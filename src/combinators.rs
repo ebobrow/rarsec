@@ -1,6 +1,6 @@
 use macros::du;
 
-use crate::{text, Parser};
+use crate::{text::empty, Parser};
 
 pub fn choice<T: 'static>(f: Parser<T>, g: Parser<T>) -> Parser<T> {
     Box::new(move |input| f(input).or_else(|| g(input)))
@@ -26,12 +26,12 @@ pub fn between<T: 'static, U: 'static, V: 'static>(
     close: Parser<V>,
     p: Parser<T>,
 ) -> Parser<T> {
-    du! {
+    Box::new(du! {
         open;
         let res <- p;
         close;
         return res;
-    }
+    })
 }
 
 pub fn sequence<T: 'static, U: 'static>(f: Parser<T>, g: Parser<U>) -> Parser<(T, U)> {
@@ -73,23 +73,23 @@ pub fn option_option<T: 'static>(f: Parser<T>) -> Parser<Option<T>> {
 
 pub fn optional<T: 'static>(f: Parser<T>) -> Parser<()> {
     choice(
-        du! {
+        Box::new(du! {
             f;
             return ();
-        },
-        text::empty(),
+        }),
+        empty(),
     )
 
     // TODO: multiple symbols don't work?
     // TODO: maybe custom struct for nested closures
     // du! {
-    //     let res <- f >> text::empty() | text::empty();
+    //     let res <- f >> empty() | empty();
     //     return res;
     // }
 
     // TODO: return as keyword
     // du! {
-    //     let res <- (f >> return ()) | text::empty();
+    //     let res <- (f >> return ()) | empty();
     //     return res;
     // }
 }
@@ -145,39 +145,26 @@ pub fn many<T: 'static>(f: Parser<T>) -> Parser<Vec<T>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::text;
+    use crate::text::{character, letter, one_of};
 
     #[test]
     fn combinators() {
         let input = "hello";
         assert_eq!(
-            choice(text::character('x'), text::character('h'))(input),
+            choice(character('x'), character('h'))(input),
             Some(('h', "ello"))
         );
         assert_eq!(
-            sequence(text::character('h'), text::character('e'))(input),
+            sequence(character('h'), character('e'))(input),
             Some((('h', 'e'), "llo"))
         );
+        assert_eq!(many(one_of("he"))(input), Some((vec!['h', 'e'], "llo")));
+        assert_eq!(many(one_of("abc"))(input), Some((Vec::new(), "hello")));
+        assert_eq!(optional(character('!'))(input), Some(((), "hello")));
+        assert_eq!(optional(character('h'))(input), Some(((), "ello")));
+        assert_eq!(count(3, letter())(input), Some((vec!['h', 'e', 'l'], "lo")));
         assert_eq!(
-            many(text::one_of("he"))(input),
-            Some((vec!['h', 'e'], "llo"))
-        );
-        assert_eq!(
-            many(text::one_of("abc"))(input),
-            Some((Vec::new(), "hello"))
-        );
-        assert_eq!(optional(text::character('!'))(input), Some(((), "hello")));
-        assert_eq!(optional(text::character('h'))(input), Some(((), "ello")));
-        assert_eq!(
-            count(3, text::letter())(input),
-            Some((vec!['h', 'e', 'l'], "lo"))
-        );
-        assert_eq!(
-            between(
-                text::character('('),
-                text::character(')'),
-                many(text::letter())
-            )("(hi)"),
+            between(character('('), character(')'), many(letter()))("(hi)"),
             Some((vec!['h', 'i'], ""))
         );
     }

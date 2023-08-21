@@ -1,12 +1,13 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse::Parse, parse_macro_input, BinOp, Expr, Ident, Token};
+use syn::{parse::Parse, parse_macro_input, BinOp, Expr, ExprCall, Ident, Token};
 
 struct Line {
     x: Option<Ident>,
     f: Expr,
 }
 
+// TODO: implicit return for stuff like `du! { f() >> g() }`
 struct MacroInput {
     lines: Vec<Line>,
     ret: Expr,
@@ -78,6 +79,10 @@ fn quote_expr(e: &Expr) -> proc_macro2::TokenStream {
             }
         }
         Expr::Group(group) => quote_expr(&group.expr),
+        Expr::Call(ExprCall { args, func, .. }) => {
+            let args = args.clone().into_iter().map(|arg| quote_expr(&arg));
+            quote! { #func(#(#args),*) }
+        }
         _ => quote! { #e },
     }
 }
@@ -126,11 +131,11 @@ pub fn du(item: TokenStream) -> TokenStream {
             .collect();
         let ret = input.ret;
         quote! {
-            Box::new(move |input| {
+            move |input| {
                 #first_line
                 #(#next_lines)*
                 Some((#ret, rest))
-            })
+            }
         }
         .into()
     }
