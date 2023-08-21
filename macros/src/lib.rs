@@ -57,7 +57,7 @@ fn quote_expr(e: &Expr) -> proc_macro2::TokenStream {
                     let left = quote_expr(&binexp.left);
                     let right = quote_expr(&binexp.right);
                     quote! {
-                        Box::new(move |input| #left(input).or_else(|| #right(input)))
+                        (|input| #left(input).or_else(|| #right(input)))
                     }
                 }
 
@@ -66,7 +66,7 @@ fn quote_expr(e: &Expr) -> proc_macro2::TokenStream {
                     let left = quote_expr(&binexp.left);
                     let right = quote_expr(&binexp.right);
                     quote! {
-                        Box::new(move |input| {
+                        (|input| {
                             let (_, rest) = #left(input)?;
                             let (tree, rest) = #right(rest)?;
                             Some((tree, rest))
@@ -77,7 +77,7 @@ fn quote_expr(e: &Expr) -> proc_macro2::TokenStream {
                 _ => unimplemented!(),
             }
         }
-        Expr::Group(group) => quote_expr(&group.expr),
+        Expr::Paren(group) => quote_expr(&group.expr),
         Expr::Call(ExprCall { args, func, .. }) => {
             let args = args.clone().into_iter().map(|arg| quote_expr(&arg));
             quote! { #func(#(#args),*) }
@@ -100,11 +100,20 @@ fn quote_expr(e: &Expr) -> proc_macro2::TokenStream {
 /// ```
 #[proc_macro]
 pub fn du(item: TokenStream) -> TokenStream {
+    do_du(item, false)
+}
+
+#[proc_macro]
+pub fn dum(item: TokenStream) -> TokenStream {
+    do_du(item, true)
+}
+
+fn do_du(item: TokenStream, m: bool) -> TokenStream {
     let input = parse_macro_input!(item as MacroInput);
     if input.lines.len() == 0 {
         let ret = input.ret;
         TokenStream::from(quote! {
-            Box::new(move |input| {
+            (|input| {
                 Some((#ret, input))
             })
         })
@@ -129,13 +138,24 @@ pub fn du(item: TokenStream) -> TokenStream {
             })
             .collect();
         let ret = input.ret;
-        quote! {
-            move |input| {
-                #first_line
-                #(#next_lines)*
-                Some((#ret, rest))
+        if m {
+            quote! {
+                move |input| {
+                    #first_line
+                    #(#next_lines)*
+                    Some((#ret, rest))
+                }
             }
+            .into()
+        } else {
+            quote! {
+                |input| {
+                    #first_line
+                    #(#next_lines)*
+                    Some((#ret, rest))
+                }
+            }
+            .into()
         }
-        .into()
     }
 }

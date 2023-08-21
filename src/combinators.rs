@@ -1,15 +1,15 @@
-use macros::du;
+use macros::dum;
 
-use crate::{text::empty, Parser};
+use crate::{parser, text::empty};
 
 /// Parse using `f`, or if `f` fails, using `g`
-pub fn choice<T: 'static>(f: Parser<T>, g: Parser<T>) -> Parser<T> {
-    Box::new(move |input| f(input).or_else(|| g(input)))
+pub fn choice<T: 'static>(f: parser!(T), g: parser!(T)) -> parser!(T) {
+    move |input| f(input).or_else(|| g(input))
 }
 
 /// Parse `n` consecutive occurrences of `f`
-pub fn count<T: 'static>(n: usize, f: Parser<T>) -> Parser<Vec<T>> {
-    Box::new(move |input| {
+pub fn count<T: 'static>(n: usize, f: parser!(T)) -> parser!(Vec<T>) {
+    move |input| {
         let mut res = Vec::with_capacity(n);
         let (tree, rest) = f(input)?;
         res.push(tree);
@@ -20,7 +20,7 @@ pub fn count<T: 'static>(n: usize, f: Parser<T>) -> Parser<Vec<T>> {
             ptr = rest;
         }
         Some((res, ptr))
-    })
+    }
 }
 
 /// Parse `p` if it occurs between `open` and `close`
@@ -31,66 +31,56 @@ pub fn count<T: 'static>(n: usize, f: Parser<T>) -> Parser<Vec<T>> {
 /// assert_eq!(parse(parens, "(1)").unwrap(), '1');
 /// ```
 pub fn between<T: 'static, U: 'static, V: 'static>(
-    open: Parser<U>,
-    close: Parser<V>,
-    p: Parser<T>,
-) -> Parser<T> {
-    Box::new(du! {
+    open: parser!(U),
+    close: parser!(V),
+    p: parser!(T),
+) -> parser!(T) {
+    dum! {
         open;
         let res <- p;
         close;
         return res;
-    })
+    }
 }
 
 /// Parse `f`, discarding its output, and then parse `g`. This is the same as `f >> g` in Haskell
 /// or `du!` notation.
-pub fn then<T: 'static, U: 'static>(f: Parser<T>, g: Parser<U>) -> Parser<U> {
-    Box::new(move |input| {
+pub fn then<T: 'static, U: 'static>(f: parser!(T), g: parser!(U)) -> parser!(U) {
+    move |input| {
         let (_, rest) = f(input)?;
         let (gtree, rest) = g(rest)?;
         Some((gtree, rest))
-    })
+    }
 }
 
 /// Attempt parsing using `f`, returning `default` if it fails
-pub fn option<T: Clone + 'static>(default: T, f: Parser<T>) -> Parser<T> {
-    Box::new(move |input| {
+pub fn option<T: Clone + 'static>(default: T, f: parser!(T)) -> parser!(T) {
+    move |input| {
         if let Some(res) = f(input) {
             Some(res)
         } else {
             Some((default.clone(), input))
         }
-    })
+    }
 }
 
 /// this doesn't translate well from Haskell `optionMaybe`
-pub fn option_option<T: 'static>(f: Parser<T>) -> Parser<Option<T>> {
-    Box::new(move |input| {
+pub fn option_option<T: 'static>(f: parser!(T)) -> parser!(Option<T>) {
+    move |input| {
         if let Some((tree, rest)) = f(input) {
             Some((Some(tree), rest))
         } else {
             Some((None, input))
         }
-    })
+    }
 }
 
 /// Parse 0 or 1 instances of `f`, returning `()`
-pub fn optional<T: 'static>(f: Parser<T>) -> Parser<()> {
-    choice(
-        Box::new(du! {
-            f;
-            return ();
-        }),
-        empty(),
-    )
-
-    // TODO: multiple symbols don't work?
-    // TODO: maybe custom struct for nested closures
-    // du! {
-    //     let res <- f >> empty() | empty();
-    //     return res;
-    // }
+pub fn optional<T: 'static>(f: parser!(T)) -> parser!(()) {
+    dum! {
+        let res <- f >> empty() | empty();
+        return res;
+    }
 
     // TODO: return as keyword
     // du! {
@@ -100,8 +90,8 @@ pub fn optional<T: 'static>(f: Parser<T>) -> Parser<()> {
 }
 
 /// Skip 1 or more instances of `f`, returning `()`
-pub fn skip_many1<T: 'static>(f: Parser<T>) -> Parser<()> {
-    Box::new(move |input| {
+pub fn skip_many1<T: 'static>(f: parser!(T)) -> parser!(()) {
+    move |input| {
         if let Some((_, rest)) = f(input) {
             let mut ptr = rest;
             while let Some((_, rest)) = f(ptr) {
@@ -111,12 +101,12 @@ pub fn skip_many1<T: 'static>(f: Parser<T>) -> Parser<()> {
         } else {
             None
         }
-    })
+    }
 }
 
 /// Parse 1 or more instances of `f`
-pub fn many1<T: 'static>(f: Parser<T>) -> Parser<Vec<T>> {
-    Box::new(move |input| {
+pub fn many1<T: 'static>(f: parser!(T)) -> parser!(Vec<T>) {
+    move |input| {
         let mut out = Vec::new();
         if let Some((tree, rest)) = f(input) {
             let mut ptr = rest;
@@ -129,12 +119,12 @@ pub fn many1<T: 'static>(f: Parser<T>) -> Parser<Vec<T>> {
         } else {
             None
         }
-    })
+    }
 }
 
 /// Parse 0 or more instances of `f`
-pub fn many<T: 'static>(f: Parser<T>) -> Parser<Vec<T>> {
-    Box::new(move |input| {
+pub fn many<T: 'static>(f: parser!(T)) -> parser!(Vec<T>) {
+    move |input| {
         let mut out = Vec::new();
         if let Some((tree, rest)) = f(input) {
             let mut ptr = rest;
@@ -147,7 +137,7 @@ pub fn many<T: 'static>(f: Parser<T>) -> Parser<Vec<T>> {
         } else {
             Some((Vec::new(), input))
         }
-    })
+    }
 }
 
 /// Parse 0 or more instances of `f`, separated by `sep`
@@ -157,8 +147,8 @@ pub fn many<T: 'static>(f: Parser<T>) -> Parser<Vec<T>> {
 /// let num_list = sep_by(digit(), character(','));
 /// assert_eq!(parse(num_list, "1,2,3").unwrap(), vec!['1', '2', '3']);
 /// ```
-pub fn sep_by<T: 'static, U: 'static>(f: Parser<T>, sep: Parser<U>) -> Parser<Vec<T>> {
-    Box::new(move |input| {
+pub fn sep_by<T: 'static, U: 'static>(f: parser!(T), sep: parser!(U)) -> parser!(Vec<T>) {
+    move |input| {
         let mut out = Vec::new();
         if let Some((tree, rest)) = f(input) {
             let mut ptr = rest;
@@ -172,12 +162,12 @@ pub fn sep_by<T: 'static, U: 'static>(f: Parser<T>, sep: Parser<U>) -> Parser<Ve
         } else {
             Some((Vec::new(), input))
         }
-    })
+    }
 }
 
 /// Parse 1 or more instances of `f`, separated by `sep`
-pub fn sep_by1<T: 'static, U: 'static>(f: Parser<T>, sep: Parser<U>) -> Parser<Vec<T>> {
-    Box::new(move |input| {
+pub fn sep_by1<T: 'static, U: 'static>(f: parser!(T), sep: parser!(U)) -> parser!(Vec<T>) {
+    move |input| {
         let mut out = Vec::new();
         if let Some((tree, rest)) = f(input) {
             let mut ptr = rest;
@@ -191,7 +181,7 @@ pub fn sep_by1<T: 'static, U: 'static>(f: Parser<T>, sep: Parser<U>) -> Parser<V
         } else {
             None
         }
-    })
+    }
 }
 
 #[cfg(test)]

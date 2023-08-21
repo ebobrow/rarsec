@@ -1,8 +1,7 @@
 use rarsec::{
     combinators::{many, optional},
-    du,
+    du, parser,
     text::{character, letter, newline, none_of, one_of},
-    Parser,
 };
 
 #[derive(Debug, PartialEq)]
@@ -11,16 +10,16 @@ struct Sequence {
     seq: String,
 }
 
-fn parse_line() -> Parser<String> {
-    Box::new(du! {
+fn parse_line() -> parser!(String) {
+    du! {
         newline();
         let chars <- many(letter() | one_of("*-"));
         return chars.iter().collect();
-    })
+    }
 }
 
-fn parse_sequence() -> Parser<Sequence> {
-    Box::new(du! {
+fn parse_sequence() -> parser!(Sequence) {
+    du! {
         character('>');
         let desc <- many(none_of("\n"));
         let seq <- many(parse_line());
@@ -29,7 +28,7 @@ fn parse_sequence() -> Parser<Sequence> {
             desc: desc.iter().collect(),
             seq: seq.iter().flat_map(|s| s.chars()).collect(),
         };
-    })
+    }
 }
 
 fn main() {
