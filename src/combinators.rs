@@ -150,10 +150,54 @@ pub fn many<T: 'static>(f: Parser<T>) -> Parser<Vec<T>> {
     })
 }
 
+/// Parse 0 or more instances of `f`, separated by `sep`
+/// # Example:
+/// ```rust
+/// # use rarsec::{combinators::sep_by, parse, text::{character, digit}};
+/// let num_list = sep_by(digit(), character(','));
+/// assert_eq!(parse(num_list, "1,2,3").unwrap(), vec!['1', '2', '3']);
+/// ```
+pub fn sep_by<T: 'static, U: 'static>(f: Parser<T>, sep: Parser<U>) -> Parser<Vec<T>> {
+    Box::new(move |input| {
+        let mut out = Vec::new();
+        if let Some((tree, rest)) = f(input) {
+            let mut ptr = rest;
+            out.push(tree);
+            while let Some((_, rest)) = sep(ptr) {
+                let (tree, rest) = f(rest)?;
+                out.push(tree);
+                ptr = rest;
+            }
+            Some((out, ptr))
+        } else {
+            Some((Vec::new(), input))
+        }
+    })
+}
+
+/// Parse 1 or more instances of `f`, separated by `sep`
+pub fn sep_by1<T: 'static, U: 'static>(f: Parser<T>, sep: Parser<U>) -> Parser<Vec<T>> {
+    Box::new(move |input| {
+        let mut out = Vec::new();
+        if let Some((tree, rest)) = f(input) {
+            let mut ptr = rest;
+            out.push(tree);
+            while let Some((_, rest)) = sep(ptr) {
+                let (tree, rest) = f(rest)?;
+                out.push(tree);
+                ptr = rest;
+            }
+            Some((out, ptr))
+        } else {
+            None
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::text::{character, letter, one_of};
+    use crate::text::{character, digit, letter, one_of};
 
     #[test]
     fn combinators() {
@@ -163,7 +207,9 @@ mod tests {
             Some(('h', "ello"))
         );
         assert_eq!(many(one_of("he"))(input), Some((vec!['h', 'e'], "llo")));
+        assert_eq!(many1(one_of("he"))(input), Some((vec!['h', 'e'], "llo")));
         assert_eq!(many(one_of("abc"))(input), Some((Vec::new(), "hello")));
+        assert_eq!(many1(one_of("abc"))(input), None);
         assert_eq!(optional(character('!'))(input), Some(((), "hello")));
         assert_eq!(optional(character('h'))(input), Some(((), "ello")));
         assert_eq!(count(3, letter())(input), Some((vec!['h', 'e', 'l'], "lo")));
@@ -171,5 +217,18 @@ mod tests {
             between(character('('), character(')'), many(letter()))("(hi)"),
             Some((vec!['h', 'i'], ""))
         );
+        assert_eq!(
+            sep_by(digit(), character(','))("1,..."),
+            Some((vec!['1'], ",..."))
+        );
+        assert_eq!(
+            sep_by1(digit(), character(','))("1,2,3..."),
+            Some((vec!['1', '2', '3'], "..."))
+        );
+        assert_eq!(
+            sep_by(letter(), character('/'))("1/2/3"),
+            Some((Vec::new(), "1/2/3"))
+        );
+        assert_eq!(sep_by1(letter(), character('/'))("1/2/3"), None);
     }
 }
