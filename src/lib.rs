@@ -6,6 +6,12 @@ pub use macros::du;
 // TODO: not just strings (maybe use Read trait)
 pub type Parser<T> = Box<dyn Fn(&str) -> Option<(T, &str)>>;
 
+pub fn parse<T>(parser: Parser<T>, input: &str) -> Option<T> {
+    let (tree, rest) = parser(input)?;
+    assert!(rest.is_empty());
+    Some(tree)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

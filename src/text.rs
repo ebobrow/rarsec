@@ -53,6 +53,14 @@ pub fn whitespace() -> Parser<char> {
     satisfy(|c| c.is_whitespace())
 }
 
+pub fn newline() -> Parser<char> {
+    character('\n')
+}
+
+pub fn none_of(xs: &'static str) -> Parser<char> {
+    satisfy(|c| !xs.contains(c))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

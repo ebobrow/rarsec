@@ -7,3 +7,7 @@ edition = "2021"
 
 [dependencies]
 macros = { path = "./macros" }
+
+[[example]]
+name = "fasta"
+path = "examples/fasta.rs"
