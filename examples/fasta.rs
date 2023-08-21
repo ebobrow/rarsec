@@ -1,6 +1,6 @@
 use rarsec::{
     combinators::{many, optional},
-    du, parser,
+    du, parse, parser,
     text::{character, letter, newline, none_of, one_of},
 };
 
@@ -41,7 +41,7 @@ A
 C
 G
 T"#;
-    let (seq, _) = many(parse_sequence())(test).unwrap();
+    let seq = parse(many(parse_sequence()), test).unwrap();
     println!("{:#?}", seq);
     assert_eq!(
         seq,
